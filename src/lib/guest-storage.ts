@@ -149,6 +149,52 @@ export function toggleGuestCompletion(
   saveGuestData(guestData);
 }
 
+// ---- Category mutation helpers ----
+
+export function createGuestCategory(data: {
+  name: string;
+  color: string;
+  icon: string;
+}): Category {
+  const guestData = getGuestData();
+  const now = new Date().toISOString();
+  const newCategory: Category = {
+    id: crypto.randomUUID(),
+    user_id: "guest",
+    name: data.name,
+    color: data.color,
+    icon: data.icon,
+    is_default: false,
+    sort_order: guestData.categories.length,
+    created_at: now,
+  };
+  guestData.categories.push(newCategory);
+  saveGuestData(guestData);
+  return newCategory;
+}
+
+export function updateGuestCategory(
+  id: string,
+  data: Partial<Pick<Category, "name" | "color" | "icon">>
+): Category {
+  const guestData = getGuestData();
+  const idx = guestData.categories.findIndex((c) => c.id === id);
+  if (idx === -1) throw new Error("Category not found");
+  guestData.categories[idx] = { ...guestData.categories[idx], ...data };
+  saveGuestData(guestData);
+  return guestData.categories[idx];
+}
+
+export function deleteGuestCategory(id: string): void {
+  const guestData = getGuestData();
+  guestData.categories = guestData.categories.filter((c) => c.id !== id);
+  // Null out category_id on any todos that referenced this category
+  guestData.todos = guestData.todos.map((t) =>
+    t.category_id === id ? { ...t, category_id: null } : t
+  );
+  saveGuestData(guestData);
+}
+
 export function updateGuestLastPromptDate(date: string): void {
   const guestData = getGuestData();
   guestData.lastPromptDate = date;

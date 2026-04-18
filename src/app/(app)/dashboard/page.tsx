@@ -1,12 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { format } from "date-fns";
-import { Plus, ClipboardCheck } from "lucide-react";
+import { Plus, ClipboardCheck, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { TodoList } from "@/components/todos/todo-list";
 import { AddTodoDialog } from "@/components/todos/add-todo-dialog";
+import { CategoryManagerDialog } from "@/components/todos/category-manager-dialog";
 import { DailyReviewDialog } from "@/components/review/daily-review-dialog";
 import { useTodos } from "@/hooks/use-todos";
 import { useCategories } from "@/hooks/use-categories";
@@ -15,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const { data: todos } = useTodos();
   const { data: categories } = useCategories();
   const setAddTodoOpen = useAppStore((s) => s.setAddTodoOpen);
@@ -70,35 +73,46 @@ export default function DashboardPage() {
       </Card>
 
       {/* Category filters */}
-      {categories && categories.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge
-            variant={selectedCategoryId === null ? "default" : "outline"}
-            className="cursor-pointer"
-            onClick={() => setSelectedCategoryId(null)}
-          >
-            All
-          </Badge>
-          {categories.map((cat) => (
+      <div className="flex items-center gap-2 flex-wrap">
+        {categories && categories.length > 0 && (
+          <>
             <Badge
-              key={cat.id}
-              variant={selectedCategoryId === cat.id ? "default" : "outline"}
-              className={cn("cursor-pointer")}
-              onClick={() =>
-                setSelectedCategoryId(
-                  selectedCategoryId === cat.id ? null : cat.id
-                )
-              }
+              variant={selectedCategoryId === null ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => setSelectedCategoryId(null)}
             >
-              <span
-                className="h-2 w-2 rounded-full mr-1.5"
-                style={{ backgroundColor: cat.color }}
-              />
-              {cat.name}
+              All
             </Badge>
-          ))}
-        </div>
-      )}
+            {categories.map((cat) => (
+              <Badge
+                key={cat.id}
+                variant={selectedCategoryId === cat.id ? "default" : "outline"}
+                className={cn("cursor-pointer")}
+                onClick={() =>
+                  setSelectedCategoryId(
+                    selectedCategoryId === cat.id ? null : cat.id
+                  )
+                }
+              >
+                <span
+                  className="h-2 w-2 rounded-full mr-1.5"
+                  style={{ backgroundColor: cat.color }}
+                />
+                {cat.name}
+              </Badge>
+            ))}
+          </>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 ml-auto shrink-0"
+          onClick={() => setCategoryManagerOpen(true)}
+          title="Manage categories"
+        >
+          <Settings2 className="h-4 w-4" />
+        </Button>
+      </div>
 
       {/* Todo list */}
       <TodoList />
@@ -106,6 +120,10 @@ export default function DashboardPage() {
       {/* Dialogs */}
       <AddTodoDialog />
       <DailyReviewDialog />
+      <CategoryManagerDialog
+        open={categoryManagerOpen}
+        onOpenChange={setCategoryManagerOpen}
+      />
     </div>
   );
 }
