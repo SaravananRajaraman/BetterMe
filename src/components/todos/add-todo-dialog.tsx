@@ -70,8 +70,10 @@ export function AddTodoDialog() {
       setValue("description", editingTodo.description || "");
       setValue("category_id", editingTodo.category_id || "");
       setValue("reminder_time", editingTodo.reminder_time || "");
+    } else {
+      reset();
     }
-  }, [editingTodo, setValue]);
+  }, [editingTodo, setValue, reset]);
 
   const isOpen = addTodoOpen || isEditing;
 

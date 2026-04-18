@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/lib/types";
 import { useAppStore } from "@/stores/app-store";
@@ -19,6 +19,7 @@ const supabase = createClient();
 export function useCategories() {
   const isGuestMode = useAppStore((s) => s.isGuestMode);
   const queryClient = useQueryClient();
+  const isSeedingRef = useRef(false);
 
   const query = useQuery({
     queryKey: isGuestMode ? ["guest-categories"] : ["categories"],
@@ -47,25 +48,32 @@ export function useCategories() {
   useEffect(() => {
     if (isGuestMode || query.isLoading || query.data === undefined) return;
     if (query.data.length > 0) return;
+    if (isSeedingRef.current) return;
+    isSeedingRef.current = true;
 
     (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
 
-      await supabase.from("categories").insert(
-        DEFAULT_CATEGORIES.map((c, i) => ({
-          user_id: user.id,
-          name: c.name,
-          color: c.color,
-          icon: c.icon,
-          is_default: true,
-          sort_order: i,
-        }))
-      );
+        await supabase.from("categories").insert(
+          DEFAULT_CATEGORIES.map((c, i) => ({
+            user_id: user.id,
+            name: c.name,
+            color: c.color,
+            icon: c.icon,
+            is_default: true,
+            sort_order: i,
+          }))
+        );
 
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
+        queryClient.invalidateQueries({ queryKey: ["categories"] });
+      } catch (error) {
+        console.error("Failed to seed categories:", error);
+        isSeedingRef.current = false;
+      }
     })();
   }, [isGuestMode, query.isLoading, query.data, queryClient]);
 

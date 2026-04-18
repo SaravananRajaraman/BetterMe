@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export function GoogleSignInButton() {
   const [isLoading, setIsLoading] = useState(false);
@@ -20,6 +21,7 @@ export function GoogleSignInButton() {
 
     if (error) {
       console.error("Sign in error:", error);
+      toast.error("Failed to sign in with Google. Please try again.");
       setIsLoading(false);
     }
   };

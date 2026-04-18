@@ -45,10 +45,13 @@ export function WeeklyChart() {
         )
       : 0;
 
-  const bestDay = chartData.reduce(
-    (best, d) => (d.completionRate > (best?.completionRate || 0) ? d : best),
-    chartData[0]
-  );
+  const bestDay =
+    chartData.length > 0
+      ? chartData.reduce(
+          (best, d) => (d.completionRate > best.completionRate ? d : best),
+          chartData[0]
+        )
+      : null;
 
   const totalCompleted = chartData.reduce(
     (sum, d) => sum + d.completedCount,

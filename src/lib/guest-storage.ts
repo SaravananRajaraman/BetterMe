@@ -271,9 +271,8 @@ export async function migrateGuestDataToSupabase(
     if (newTodo) todoIdMap[todo.id] = newTodo.id;
   }
 
-  // Migrate today's completions
-  const today = new Date().toISOString().split("T")[0];
-  for (const comp of data.completions.filter((c) => c.completed_date === today)) {
+  // Migrate all completions (not just today's)
+  for (const comp of data.completions) {
     const newTodoId = todoIdMap[comp.todo_id];
     if (!newTodoId) continue;
     await supabase.from("todo_completions").insert({

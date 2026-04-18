@@ -63,12 +63,20 @@ export function useNotifications() {
       if (!user) return false;
 
       const subJson = subscription.toJSON();
+      const p256dh = subJson.keys?.p256dh;
+      const auth = subJson.keys?.auth;
+
+      if (!p256dh || !auth) {
+        toast.error("Failed to enable notifications: invalid subscription keys");
+        return false;
+      }
+
       const { error } = await supabase.from("push_subscriptions").upsert(
         {
           user_id: user.id,
           endpoint: subscription.endpoint,
-          keys_p256dh: subJson.keys?.p256dh || "",
-          keys_auth: subJson.keys?.auth || "",
+          keys_p256dh: p256dh,
+          keys_auth: auth,
         },
         { onConflict: "user_id,endpoint" }
       );
@@ -110,6 +118,7 @@ export function useNotifications() {
       toast.success("Notifications disabled");
     } catch (error) {
       console.error("Failed to unsubscribe:", error);
+      toast.error("Failed to disable notifications");
     }
   }, []);
 

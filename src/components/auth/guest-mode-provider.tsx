@@ -9,7 +9,10 @@ export function GuestModeProvider() {
   useEffect(() => {
     const isGuest = document.cookie
       .split(";")
-      .some((c) => c.trim() === "guest_mode=true");
+      .some((c) => {
+        const [key, val] = c.trim().split("=");
+        return key === "guest_mode" && val === "true";
+      });
     setGuestMode(isGuest);
   }, [setGuestMode]);
 

@@ -43,8 +43,12 @@ export function GuestSignupPrompt() {
   };
 
   const handleDismiss = () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-    updateGuestLastPromptDate(today);
+    try {
+      const today = format(new Date(), "yyyy-MM-dd");
+      updateGuestLastPromptDate(today);
+    } catch (error) {
+      console.error("Failed to update last prompt date:", error);
+    }
     setOpen(false);
   };
 
