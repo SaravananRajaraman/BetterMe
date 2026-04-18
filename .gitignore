@@ -43,3 +43,6 @@ next-env.d.ts
 # Playwright test results
 /playwright-report
 /test-results
+
+# Auto-generated build info (recreated on every build/dev start)
+src/lib/build-info.ts

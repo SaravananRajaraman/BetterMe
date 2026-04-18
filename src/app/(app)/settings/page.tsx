@@ -15,6 +15,12 @@ import { toast } from "sonner";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useRouter } from "next/navigation";
 import type { Database, Profile } from "@/lib/types";
+import {
+  BUILD_VERSION,
+  COMMIT_HASH,
+  BUILD_TIMESTAMP,
+  BUILD_ENVIRONMENT,
+} from "@/lib/build-info";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
@@ -209,6 +215,43 @@ export default function SettingsPage() {
           <Button variant="outline" onClick={handleSignOut}>
             Sign out
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* About */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">About</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Version</span>
+            <span className="text-sm font-medium">v{BUILD_VERSION}</span>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Commit</span>
+            <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">
+              {COMMIT_HASH}
+            </code>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Built</span>
+            <span className="text-sm text-muted-foreground">
+              {new Date(BUILD_TIMESTAMP).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </span>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Environment</span>
+            <span className="text-xs font-medium uppercase tracking-wide">
+              {BUILD_ENVIRONMENT}
+            </span>
+          </div>
         </CardContent>
       </Card>
     </div>
