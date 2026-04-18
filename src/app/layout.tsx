@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   title: "BetterMe — Daily Habit Tracker",
   description:
     "Track your daily habits, build streaks, and become a better version of yourself.",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
