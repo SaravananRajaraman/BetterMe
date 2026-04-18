@@ -21,17 +21,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-        suppressHydrationWarning
-      >
-        <ServiceWorkerRegister />
-        {children}
-        <Toaster richColors position="top-center" />
-      </ThemeProvider>
+      <div suppressHydrationWarning>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ServiceWorkerRegister />
+          {children}
+          <Toaster richColors position="top-center" />
+        </ThemeProvider>
+      </div>
     </QueryClientProvider>
   );
 }
