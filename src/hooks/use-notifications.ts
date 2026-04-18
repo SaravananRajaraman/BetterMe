@@ -27,6 +27,23 @@ export function useNotifications() {
     }
   }, []);
 
+  // Restore isSubscribed state from the browser's existing push subscription on mount
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    const checkExisting = async () => {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          setIsSubscribed(true);
+        }
+      } catch {
+        // Service worker not available yet; leave as false
+      }
+    };
+    checkExisting();
+  }, []);
+
   const requestPermission = useCallback(async () => {
     if (!("Notification" in window)) {
       toast.error("This browser does not support notifications");
