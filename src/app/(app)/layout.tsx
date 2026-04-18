@@ -1,4 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
+import { GuestModeProvider } from "@/components/auth/guest-mode-provider";
+import { GuestSignupPrompt } from "@/components/auth/guest-signup-prompt";
 
 export default function AppLayout({
   children,
@@ -7,6 +9,8 @@ export default function AppLayout({
 }) {
   return (
     <div className="min-h-screen">
+      <GuestModeProvider />
+      <GuestSignupPrompt />
       <Navbar />
       {/* Main content - offset for desktop sidebar, offset for mobile bottom nav */}
       <main className="md:pl-64 pb-20 md:pb-0">

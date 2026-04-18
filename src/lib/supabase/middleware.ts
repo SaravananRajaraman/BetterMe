@@ -40,7 +40,10 @@ export async function updateSession(request: NextRequest) {
     (path) => request.nextUrl.pathname === path
   );
 
-  if (!user && !isPublicPath) {
+  // Allow guest mode through protected routes
+  const isGuestMode = request.cookies.get("guest_mode")?.value === "true";
+
+  if (!user && !isPublicPath && !isGuestMode) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

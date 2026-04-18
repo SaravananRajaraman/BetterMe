@@ -9,6 +9,8 @@ interface AppState {
   setEditTodoId: (id: string | null) => void;
   reviewOpen: boolean;
   setReviewOpen: (open: boolean) => void;
+  isGuestMode: boolean;
+  setGuestMode: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -20,4 +22,6 @@ export const useAppStore = create<AppState>((set) => ({
   setEditTodoId: (id) => set({ editTodoId: id }),
   reviewOpen: false,
   setReviewOpen: (open) => set({ reviewOpen: open }),
+  isGuestMode: false,
+  setGuestMode: (v) => set({ isGuestMode: v }),
 }));

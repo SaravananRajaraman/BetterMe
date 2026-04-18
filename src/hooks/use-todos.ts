@@ -5,15 +5,28 @@ import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import type { TodoWithCompletion } from "@/lib/types";
 import { toast } from "sonner";
+import { useAppStore } from "@/stores/app-store";
+import {
+  getGuestTodosForDate,
+  createGuestTodo,
+  updateGuestTodo,
+  deleteGuestTodo,
+  toggleGuestCompletion,
+} from "@/lib/guest-storage";
 
 const supabase = createClient();
 
 export function useTodos(date?: string) {
   const today = date || format(new Date(), "yyyy-MM-dd");
+  const isGuestMode = useAppStore((s) => s.isGuestMode);
 
   return useQuery({
-    queryKey: ["todos", today],
+    queryKey: isGuestMode ? ["guest-todos", today] : ["todos", today],
     queryFn: async (): Promise<TodoWithCompletion[]> => {
+      if (isGuestMode) {
+        return getGuestTodosForDate(today);
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -57,6 +70,7 @@ export function useTodos(date?: string) {
 
 export function useCreateTodo() {
   const queryClient = useQueryClient();
+  const isGuestMode = useAppStore((s) => s.isGuestMode);
 
   return useMutation({
     mutationFn: async (data: {
@@ -65,6 +79,10 @@ export function useCreateTodo() {
       category_id?: string;
       reminder_time?: string;
     }) => {
+      if (isGuestMode) {
+        return createGuestTodo(data);
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -86,7 +104,9 @@ export function useCreateTodo() {
       return todo;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
+      queryClient.invalidateQueries({
+        queryKey: isGuestMode ? ["guest-todos"] : ["todos"],
+      });
       toast.success("Todo created!");
     },
     onError: (error) => {
@@ -97,6 +117,7 @@ export function useCreateTodo() {
 
 export function useUpdateTodo() {
   const queryClient = useQueryClient();
+  const isGuestMode = useAppStore((s) => s.isGuestMode);
 
   return useMutation({
     mutationFn: async ({
@@ -109,6 +130,10 @@ export function useUpdateTodo() {
       category_id?: string | null;
       reminder_time?: string | null;
     }) => {
+      if (isGuestMode) {
+        return updateGuestTodo(id, data);
+      }
+
       const { data: todo, error } = await supabase
         .from("todos")
         .update({ ...data, updated_at: new Date().toISOString() })
@@ -120,7 +145,9 @@ export function useUpdateTodo() {
       return todo;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
+      queryClient.invalidateQueries({
+        queryKey: isGuestMode ? ["guest-todos"] : ["todos"],
+      });
       toast.success("Todo updated!");
     },
     onError: (error) => {
@@ -131,14 +158,21 @@ export function useUpdateTodo() {
 
 export function useDeleteTodo() {
   const queryClient = useQueryClient();
+  const isGuestMode = useAppStore((s) => s.isGuestMode);
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isGuestMode) {
+        deleteGuestTodo(id);
+        return;
+      }
       const { error } = await supabase.from("todos").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
+      queryClient.invalidateQueries({
+        queryKey: isGuestMode ? ["guest-todos"] : ["todos"],
+      });
       toast.success("Todo deleted!");
     },
     onError: (error) => {
@@ -149,6 +183,7 @@ export function useDeleteTodo() {
 
 export function useToggleCompletion() {
   const queryClient = useQueryClient();
+  const isGuestMode = useAppStore((s) => s.isGuestMode);
 
   return useMutation({
     mutationFn: async ({
@@ -160,12 +195,17 @@ export function useToggleCompletion() {
       completed: boolean;
       skipped?: boolean;
     }) => {
+      const today = format(new Date(), "yyyy-MM-dd");
+
+      if (isGuestMode) {
+        toggleGuestCompletion(todoId, completed, skipped, today);
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-
-      const today = format(new Date(), "yyyy-MM-dd");
 
       if (completed) {
         const { error } = await supabase.from("todo_completions").insert({
@@ -186,8 +226,12 @@ export function useToggleCompletion() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
-      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      queryClient.invalidateQueries({
+        queryKey: isGuestMode ? ["guest-todos"] : ["todos"],
+      });
+      if (!isGuestMode) {
+        queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      }
     },
   });
 }
