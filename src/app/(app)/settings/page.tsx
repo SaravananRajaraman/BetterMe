@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNotifications } from "@/hooks/use-notifications";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { BuildInfoDisplay } from "@/components/build-info-display";
 import { useRouter } from "next/navigation";
 import type { Database, Profile } from "@/lib/types";
 import {
@@ -238,12 +239,7 @@ export default function SettingsPage() {
           <Separator />
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Built</span>
-            <span className="text-sm text-muted-foreground">
-              {new Date(BUILD_TIMESTAMP).toLocaleString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              })}
-            </span>
+            <BuildInfoDisplay timestamp={BUILD_TIMESTAMP} />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
