@@ -85,6 +85,9 @@ export interface Database {
           description: string | null;
           reminder_time: string | null;
           is_recurring: boolean;
+          recurrence_type: 'daily' | 'interval' | 'weekly' | 'monthly';
+          recurrence_interval: number;
+          recurrence_days: number[] | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -97,6 +100,9 @@ export interface Database {
           description?: string | null;
           reminder_time?: string | null;
           is_recurring?: boolean;
+          recurrence_type?: 'daily' | 'interval' | 'weekly' | 'monthly';
+          recurrence_interval?: number;
+          recurrence_days?: number[] | null;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -107,6 +113,9 @@ export interface Database {
           description?: string | null;
           reminder_time?: string | null;
           is_recurring?: boolean;
+          recurrence_type?: 'daily' | 'interval' | 'weekly' | 'monthly';
+          recurrence_interval?: number;
+          recurrence_days?: number[] | null;
           is_active?: boolean;
           updated_at?: string;
         };
@@ -187,6 +196,33 @@ export interface Database {
         };
         Relationships: [];
       };
+      weight_entries: {
+        Row: {
+          id: string;
+          user_id: string;
+          weight: number;
+          unit: 'kg' | 'lbs';
+          date: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          weight: number;
+          unit?: 'kg' | 'lbs';
+          date?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          weight?: number;
+          unit?: 'kg' | 'lbs';
+          date?: string;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -231,3 +267,5 @@ export type StreakInfo = {
   longestStreak: number;
   lastCompletedDate: string | null;
 };
+
+export type WeightEntry = Database["public"]["Tables"]["weight_entries"]["Row"];

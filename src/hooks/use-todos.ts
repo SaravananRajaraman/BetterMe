@@ -2,8 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { format } from "date-fns";
-import type { TodoWithCompletion } from "@/lib/types";
+import { format, parseISO, differenceInCalendarDays, getDay, getDate } from "date-fns";
+import type { Todo, TodoWithCompletion } from "@/lib/types";
 import { toast } from "sonner";
 import { useAppStore } from "@/stores/app-store";
 import {
@@ -13,6 +13,29 @@ import {
   deleteGuestTodo,
   toggleGuestCompletion,
 } from "@/lib/guest-storage";
+
+/**
+ * Determines whether a recurring todo should appear on a given date
+ * based on its recurrence configuration.
+ */
+export function shouldShowTodoOnDate(todo: Todo, date: string): boolean {
+  if (!todo.is_recurring) return true; // one-time todos always show
+  const type = todo.recurrence_type ?? 'daily';
+  if (type === 'daily') return true;
+  if (type === 'interval') {
+    const diff = differenceInCalendarDays(parseISO(date), parseISO(todo.created_at));
+    return diff >= 0 && diff % (todo.recurrence_interval ?? 1) === 0;
+  }
+  if (type === 'weekly') {
+    const dow = getDay(parseISO(date)); // 0=Sun…6=Sat
+    return (todo.recurrence_days ?? []).includes(dow);
+  }
+  if (type === 'monthly') {
+    const dom = getDate(parseISO(date)); // 1-31
+    return (todo.recurrence_days ?? []).includes(dom);
+  }
+  return true;
+}
 
 const supabase = createClient();
 
@@ -57,8 +80,8 @@ export function useTodos(date?: string) {
 
       if (compError) throw compError;
 
-      // Merge todos with their categories and completions
-      return (todos || []).map((todo) => ({
+      // Merge todos with their categories and completions, filtered by recurrence
+      return (todos || []).filter((todo) => shouldShowTodoOnDate(todo, today)).map((todo) => ({
         ...todo,
         category: categories?.find((c) => c.id === todo.category_id) || null,
         completion:
@@ -78,6 +101,9 @@ export function useCreateTodo() {
       description?: string;
       category_id?: string;
       reminder_time?: string;
+      recurrence_type?: 'daily' | 'interval' | 'weekly' | 'monthly';
+      recurrence_interval?: number;
+      recurrence_days?: number[] | null;
     }) => {
       if (isGuestMode) {
         return createGuestTodo(data);
@@ -96,6 +122,9 @@ export function useCreateTodo() {
           description: data.description || null,
           category_id: data.category_id || null,
           reminder_time: data.reminder_time || null,
+          recurrence_type: data.recurrence_type ?? 'daily',
+          recurrence_interval: data.recurrence_interval ?? 1,
+          recurrence_days: data.recurrence_days ?? null,
         })
         .select("*, category:categories(*)")
         .single();
@@ -129,6 +158,9 @@ export function useUpdateTodo() {
       description?: string | null;
       category_id?: string | null;
       reminder_time?: string | null;
+      recurrence_type?: 'daily' | 'interval' | 'weekly' | 'monthly';
+      recurrence_interval?: number;
+      recurrence_days?: number[] | null;
     }) => {
       if (isGuestMode) {
         return updateGuestTodo(id, data);

@@ -74,10 +74,18 @@ CREATE TABLE IF NOT EXISTS public.todos (
   description TEXT,
   reminder_time TEXT,
   is_recurring BOOLEAN NOT NULL DEFAULT true,
+  recurrence_type TEXT NOT NULL DEFAULT 'daily' CHECK (recurrence_type IN ('daily', 'interval', 'weekly', 'monthly')),
+  recurrence_interval INTEGER NOT NULL DEFAULT 1,
+  recurrence_days INTEGER[],
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Migration: add recurrence columns to existing todos tables
+-- ALTER TABLE public.todos ADD COLUMN IF NOT EXISTS recurrence_type TEXT NOT NULL DEFAULT 'daily' CHECK (recurrence_type IN ('daily', 'interval', 'weekly', 'monthly'));
+-- ALTER TABLE public.todos ADD COLUMN IF NOT EXISTS recurrence_interval INTEGER NOT NULL DEFAULT 1;
+-- ALTER TABLE public.todos ADD COLUMN IF NOT EXISTS recurrence_days INTEGER[];
 
 ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
 
@@ -226,3 +234,37 @@ CREATE INDEX IF NOT EXISTS idx_todo_completions_user_date ON public.todo_complet
 CREATE INDEX IF NOT EXISTS idx_todo_completions_todo_id ON public.todo_completions(todo_id);
 CREATE INDEX IF NOT EXISTS idx_categories_user_id ON public.categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_daily_reviews_user_date ON public.daily_reviews(user_id, review_date);
+
+-- ============================================================================
+-- 9. WEIGHT ENTRIES TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.weight_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  weight DECIMAL(5,2) NOT NULL,
+  unit TEXT NOT NULL DEFAULT 'kg' CHECK (unit IN ('kg', 'lbs')),
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, date)
+);
+
+ALTER TABLE public.weight_entries ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own weight entries"
+  ON public.weight_entries FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own weight entries"
+  ON public.weight_entries FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own weight entries"
+  ON public.weight_entries FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own weight entries"
+  ON public.weight_entries FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_weight_entries_user_date ON public.weight_entries(user_id, date DESC);

@@ -2,7 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Clock, SkipForward } from "lucide-react";
+import { Pencil, Trash2, Clock, SkipForward, Repeat } from "lucide-react";
 import { CategoryBadge } from "./category-badge";
 import { useToggleCompletion, useDeleteTodo } from "@/hooks/use-todos";
 import { useAppStore } from "@/stores/app-store";
@@ -19,6 +19,40 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function RecurrenceBadge({ todo }: { todo: TodoWithCompletion }) {
+  const type = todo.recurrence_type ?? "daily";
+  if (type === "daily") return null;
+
+  let label = "";
+  if (type === "interval") {
+    label = `Every ${todo.recurrence_interval ?? 2} days`;
+  } else if (type === "weekly") {
+    const days = (todo.recurrence_days ?? [])
+      .sort((a, b) => a - b)
+      .map((d) => DAY_NAMES[d])
+      .join(", ");
+    label = days ? `Every ${days}` : "Weekly";
+  } else if (type === "monthly") {
+    const day = (todo.recurrence_days ?? [])[0];
+    label = day ? `Monthly on ${day}${ordinal(day)}` : "Monthly";
+  }
+
+  return (
+    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+      <Repeat className="h-3 w-3" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
 
 interface TodoCardProps {
   todo: TodoWithCompletion;
@@ -89,6 +123,8 @@ export function TodoCard({ todo }: TodoCardProps) {
             <span>{todo.reminder_time}</span>
           </div>
         )}
+
+        <RecurrenceBadge todo={todo} />
       </div>
 
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

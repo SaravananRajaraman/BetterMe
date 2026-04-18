@@ -61,7 +61,7 @@ export function WeeklyChart() {
   return (
     <div className="space-y-4">
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950/50">
@@ -103,26 +103,26 @@ export function WeeklyChart() {
           <CardTitle className="text-base">Daily Completion Rate</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[250px]">
+          <div className="h-[220px] sm:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
+              <LineChart data={chartData} margin={{ left: -10, right: 8, top: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
                   dataKey="day"
-                  className="text-xs"
-                  tick={{ fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                 />
                 <YAxis
                   domain={[0, 100]}
-                  className="text-xs"
-                  tick={{ fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                   tickFormatter={(v) => `${v}%`}
+                  width={40}
                 />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "8px",
+                    fontSize: "12px",
                   }}
                   formatter={(value) => [`${value}%`, "Completion"]}
                 />

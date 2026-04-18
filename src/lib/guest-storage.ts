@@ -1,5 +1,6 @@
-import type { Category, Todo, TodoCompletion, TodoWithCompletion } from "@/lib/types";
+import type { Category, Todo, TodoCompletion, TodoWithCompletion, WeightEntry } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { shouldShowTodoOnDate } from "@/hooks/use-todos";
 
 const GUEST_STORAGE_KEY = "betterme-guest-data";
 
@@ -7,6 +8,7 @@ interface GuestData {
   categories: Category[];
   todos: Todo[];
   completions: TodoCompletion[];
+  weightEntries: WeightEntry[];
   lastPromptDate: string | null;
 }
 
@@ -22,7 +24,7 @@ function buildDefaultCategories(): Category[] {
 
 export function getGuestData(): GuestData {
   if (typeof window === "undefined") {
-    return { categories: [], todos: [], completions: [], lastPromptDate: null };
+    return { categories: [], todos: [], completions: [], weightEntries: [], lastPromptDate: null };
   }
   const raw = localStorage.getItem(GUEST_STORAGE_KEY);
   if (!raw) {
@@ -30,12 +32,16 @@ export function getGuestData(): GuestData {
       categories: buildDefaultCategories(),
       todos: [],
       completions: [],
+      weightEntries: [],
       lastPromptDate: null,
     };
     localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(defaults));
     return defaults;
   }
-  return JSON.parse(raw) as GuestData;
+  const parsed = JSON.parse(raw) as GuestData;
+  // Ensure weightEntries exists for older stored data
+  if (!parsed.weightEntries) parsed.weightEntries = [];
+  return parsed;
 }
 
 export function saveGuestData(data: GuestData): void {
@@ -51,7 +57,7 @@ export function clearGuestData(): void {
 export function getGuestTodosForDate(date: string): TodoWithCompletion[] {
   const data = getGuestData();
   return data.todos
-    .filter((t) => t.is_active)
+    .filter((t) => t.is_active && shouldShowTodoOnDate(t, date))
     .map((todo) => {
       const completion =
         data.completions.find(
@@ -76,6 +82,9 @@ export function createGuestTodo(data: {
   description?: string;
   category_id?: string;
   reminder_time?: string;
+  recurrence_type?: 'daily' | 'interval' | 'weekly' | 'monthly';
+  recurrence_interval?: number;
+  recurrence_days?: number[] | null;
 }): Todo {
   const guestData = getGuestData();
   const now = new Date().toISOString();
@@ -87,6 +96,9 @@ export function createGuestTodo(data: {
     category_id: data.category_id ?? null,
     reminder_time: data.reminder_time ?? null,
     is_recurring: true,
+    recurrence_type: data.recurrence_type ?? 'daily',
+    recurrence_interval: data.recurrence_interval ?? 1,
+    recurrence_days: data.recurrence_days ?? null,
     is_active: true,
     created_at: now,
     updated_at: now,
@@ -98,7 +110,7 @@ export function createGuestTodo(data: {
 
 export function updateGuestTodo(
   id: string,
-  data: Partial<Pick<Todo, "title" | "description" | "category_id" | "reminder_time" | "is_active">>
+  data: Partial<Pick<Todo, "title" | "description" | "category_id" | "reminder_time" | "is_active" | "recurrence_type" | "recurrence_interval" | "recurrence_days">>
 ): Todo {
   const guestData = getGuestData();
   const idx = guestData.todos.findIndex((t) => t.id === id);
@@ -265,6 +277,9 @@ export async function migrateGuestDataToSupabase(
           : null,
         reminder_time: todo.reminder_time,
         is_recurring: todo.is_recurring,
+        recurrence_type: todo.recurrence_type ?? 'daily',
+        recurrence_interval: todo.recurrence_interval ?? 1,
+        recurrence_days: todo.recurrence_days ?? null,
       })
       .select()
       .single();
@@ -282,4 +297,54 @@ export async function migrateGuestDataToSupabase(
       skipped: comp.skipped,
     });
   }
+}
+
+// ---- Weight entry helpers (guest mode) ----
+
+export function getGuestWeightEntries(limit = 90): WeightEntry[] {
+  const data = getGuestData();
+  return [...data.weightEntries]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, limit);
+}
+
+export function upsertGuestWeightEntry(entry: {
+  weight: number;
+  unit: 'kg' | 'lbs';
+  date: string;
+  notes?: string;
+}): WeightEntry {
+  const guestData = getGuestData();
+  const existing = guestData.weightEntries.findIndex(
+    (e) => e.date === entry.date
+  );
+  const now = new Date().toISOString();
+  if (existing >= 0) {
+    guestData.weightEntries[existing] = {
+      ...guestData.weightEntries[existing],
+      weight: entry.weight,
+      unit: entry.unit,
+      notes: entry.notes ?? null,
+    };
+    saveGuestData(guestData);
+    return guestData.weightEntries[existing];
+  }
+  const newEntry: WeightEntry = {
+    id: crypto.randomUUID(),
+    user_id: "guest",
+    weight: entry.weight,
+    unit: entry.unit,
+    date: entry.date,
+    notes: entry.notes ?? null,
+    created_at: now,
+  };
+  guestData.weightEntries.push(newEntry);
+  saveGuestData(guestData);
+  return newEntry;
+}
+
+export function deleteGuestWeightEntry(id: string): void {
+  const guestData = getGuestData();
+  guestData.weightEntries = guestData.weightEntries.filter((e) => e.id !== id);
+  saveGuestData(guestData);
 }

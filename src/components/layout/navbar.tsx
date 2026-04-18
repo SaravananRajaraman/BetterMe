@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BarChart3, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, BarChart3, Settings, LogOut, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/weight", label: "Weight", icon: Scale },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
