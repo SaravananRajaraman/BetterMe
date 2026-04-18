@@ -192,6 +192,10 @@ CREATE POLICY "Users can delete own subscriptions"
   ON public.push_subscriptions FOR DELETE
   USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can update own subscriptions"
+  ON public.push_subscriptions FOR UPDATE
+  USING (auth.uid() = user_id);
+
 -- ============================================================================
 -- 7. AUTO-PROFILE CREATION TRIGGER
 -- When a new user signs up, automatically create their profile and default categories

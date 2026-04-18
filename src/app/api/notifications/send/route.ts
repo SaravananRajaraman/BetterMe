@@ -59,9 +59,13 @@ export async function POST(request: Request) {
       )
     );
 
-    // Clean up expired subscriptions
+    // Clean up only truly expired subscriptions (HTTP 410 Gone or 404 Not Found)
     const expiredIndices = results
-      .map((r, i) => (r.status === "rejected" ? i : -1))
+      .map((r, i) => {
+        if (r.status !== "rejected") return -1;
+        const statusCode = (r.reason as { statusCode?: number })?.statusCode;
+        return statusCode === 410 || statusCode === 404 ? i : -1;
+      })
       .filter((i) => i !== -1);
 
     for (const idx of expiredIndices) {

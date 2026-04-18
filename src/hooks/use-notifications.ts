@@ -64,7 +64,7 @@ export function useNotifications() {
 
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidKey) {
-        console.warn("VAPID public key not configured");
+        toast.error("Push notifications are not configured for this app");
         return false;
       }
 
