@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { shouldShowTodoOnDate } from '@/hooks/use-todos'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { shouldShowTodoOnDate, useTodos, useCreateTodo, useToggleTodoCompletion } from '@/hooks/use-todos'
 import { parseISO } from 'date-fns'
 import type { Todo } from '@/lib/types'
+import { renderHook, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import React from 'react'
 
 // Create a mock todo base
 const createMockTodo = (overrides: Partial<Todo> = {}): Todo => ({
@@ -20,6 +23,18 @@ const createMockTodo = (overrides: Partial<Todo> = {}): Todo => ({
   updated_at: '2024-01-01T00:00:00Z',
   ...overrides,
 })
+
+// Helper to create a wrapper with QueryClientProvider
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+  return ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: queryClient }, children)
+}
 
 describe('shouldShowTodoOnDate', () => {
   describe('Non-recurring todos', () => {
@@ -57,6 +72,20 @@ describe('shouldShowTodoOnDate', () => {
       expect(shouldShowTodoOnDate(todo, '2024-01-02')).toBe(false)
       // Day 3 (2024-01-04): 3 % 3 === 0 ✓
       expect(shouldShowTodoOnDate(todo, '2024-01-04')).toBe(true)
+      // Day 6 (2024-01-07): 6 % 3 === 0 ✓
+      expect(shouldShowTodoOnDate(todo, '2024-01-07')).toBe(true)
+    })
+
+    it('should respect interval of 1', () => {
+      const todo = createMockTodo({
+        is_recurring: true,
+        recurrence_type: 'interval',
+        recurrence_interval: 1,
+        created_at: '2024-01-01T00:00:00Z',
+      })
+      expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(true)
+      expect(shouldShowTodoOnDate(todo, '2024-01-02')).toBe(true)
+      expect(shouldShowTodoOnDate(todo, '2024-01-03')).toBe(true)
     })
 
     it('should not show interval todos before creation date', () => {
@@ -67,6 +96,19 @@ describe('shouldShowTodoOnDate', () => {
         created_at: '2024-01-10T00:00:00Z',
       })
       expect(shouldShowTodoOnDate(todo, '2024-01-05')).toBe(false)
+      expect(shouldShowTodoOnDate(todo, '2024-01-09')).toBe(false)
+      expect(shouldShowTodoOnDate(todo, '2024-01-10')).toBe(true)
+    })
+
+    it('should use default interval of 1 if not specified', () => {
+      const todo = createMockTodo({
+        is_recurring: true,
+        recurrence_type: 'interval',
+        recurrence_interval: undefined,
+        created_at: '2024-01-01T00:00:00Z',
+      })
+      expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(true)
+      expect(shouldShowTodoOnDate(todo, '2024-01-02')).toBe(true)
     })
   })
 
@@ -83,6 +125,24 @@ describe('shouldShowTodoOnDate', () => {
       expect(shouldShowTodoOnDate(todo, '2024-01-02')).toBe(false)
       // 2024-01-03 is Wednesday (day 3) ✓
       expect(shouldShowTodoOnDate(todo, '2024-01-03')).toBe(true)
+      // 2024-01-04 is Thursday (day 4) ✗
+      expect(shouldShowTodoOnDate(todo, '2024-01-04')).toBe(false)
+      // 2024-01-05 is Friday (day 5) ✓
+      expect(shouldShowTodoOnDate(todo, '2024-01-05')).toBe(true)
+    })
+
+    it('should handle weekends only', () => {
+      const todo = createMockTodo({
+        is_recurring: true,
+        recurrence_type: 'weekly',
+        recurrence_days: [0, 6], // Sunday, Saturday
+      })
+      // 2024-01-06 is Saturday (day 6) ✓
+      expect(shouldShowTodoOnDate(todo, '2024-01-06')).toBe(true)
+      // 2024-01-07 is Sunday (day 0) ✓
+      expect(shouldShowTodoOnDate(todo, '2024-01-07')).toBe(true)
+      // 2024-01-01 is Monday (day 1) ✗
+      expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(false)
     })
 
     it('should handle empty recurrence_days', () => {
@@ -102,6 +162,17 @@ describe('shouldShowTodoOnDate', () => {
       })
       expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(false)
     })
+
+    it('should handle single day', () => {
+      const todo = createMockTodo({
+        is_recurring: true,
+        recurrence_type: 'weekly',
+        recurrence_days: [3], // Wednesday only
+      })
+      expect(shouldShowTodoOnDate(todo, '2024-01-03')).toBe(true)
+      expect(shouldShowTodoOnDate(todo, '2024-01-10')).toBe(true) // Next Wednesday
+      expect(shouldShowTodoOnDate(todo, '2024-01-04')).toBe(false)
+    })
   })
 
   describe('Monthly recurring todos', () => {
@@ -117,8 +188,20 @@ describe('shouldShowTodoOnDate', () => {
       expect(shouldShowTodoOnDate(todo, '2024-01-05')).toBe(false)
       // 2024-01-15 is day 15 ✓
       expect(shouldShowTodoOnDate(todo, '2024-01-15')).toBe(true)
-      // 2024-02-30 doesn't exist, so 2024-02-29 is day 29 ✗
-      expect(shouldShowTodoOnDate(todo, '2024-02-29')).toBe(false)
+      // 2024-01-30 is day 30 ✓
+      expect(shouldShowTodoOnDate(todo, '2024-01-30')).toBe(true)
+      // 2024-02-15 is also day 15 ✓
+      expect(shouldShowTodoOnDate(todo, '2024-02-15')).toBe(true)
+    })
+
+    it('should handle every day of month', () => {
+      const todo = createMockTodo({
+        is_recurring: true,
+        recurrence_type: 'monthly',
+        recurrence_days: Array.from({ length: 31 }, (_, i) => i + 1),
+      })
+      expect(shouldShowTodoOnDate(todo, '2024-01-15')).toBe(true)
+      expect(shouldShowTodoOnDate(todo, '2024-02-15')).toBe(true)
     })
 
     it('should handle empty recurrence_days', () => {
@@ -128,6 +211,27 @@ describe('shouldShowTodoOnDate', () => {
         recurrence_days: [],
       })
       expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(false)
+      expect(shouldShowTodoOnDate(todo, '2024-02-01')).toBe(false)
+    })
+
+    it('should handle null recurrence_days', () => {
+      const todo = createMockTodo({
+        is_recurring: true,
+        recurrence_type: 'monthly',
+        recurrence_days: null,
+      })
+      expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(false)
+    })
+
+    it('should handle last day of month', () => {
+      const todo = createMockTodo({
+        is_recurring: true,
+        recurrence_type: 'monthly',
+        recurrence_days: [31],
+      })
+      expect(shouldShowTodoOnDate(todo, '2024-01-31')).toBe(true)
+      // February only has 29 days in 2024
+      expect(shouldShowTodoOnDate(todo, '2024-02-29')).toBe(false)
     })
   })
 
