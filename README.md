@@ -1,4 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BetterMe - Wellness Todo App
+
+A full-featured todo and wellness tracking application built with Next.js, React, and Supabase.
+
+## Features
+
+- ✅ **Todo Management**: Create, organize, and track recurring tasks
+- 📊 **Analytics**: Weight tracking and progress visualization
+- 👤 **Authentication**: Email/password and OAuth sign-in
+- 🎯 **Categories**: Organize todos with custom categories
+- 🌙 **Dark Mode**: Built-in dark/light theme support
+- 📱 **Responsive Design**: Works on desktop, tablet, and mobile
+- 💾 **Guest Mode**: Try the app without signing up
+- 🔔 **Notifications**: Toast notifications and reminders
+- 🧪 **Comprehensive Testing**: 188+ unit tests + E2E tests
+
+## Testing
+
+See [TESTING.md](./TESTING.md) for complete testing documentation.
+
+```bash
+# Run unit tests
+npm run test
+
+# Run with coverage report
+npm run test:coverage
+
+# Run E2E tests
+npm run test:e2e
+
+# Run with UI
+npm run test:ui
+npm run test:e2e:ui
+```
+
+**Current Test Coverage**:
+- 188 unit tests
+- 71.42% statement coverage
+- 8 files at 100% coverage
+- Multiple E2E test suites
 
 ## Getting Started
 
