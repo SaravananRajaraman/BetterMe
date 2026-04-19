@@ -27,6 +27,7 @@ import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 const RECURRENCE_TYPES = [
+  { value: "one_time", label: "One Time" },
   { value: "daily", label: "Daily" },
   { value: "interval", label: "Every N Days" },
   { value: "weekly", label: "Weekly" },
@@ -40,7 +41,7 @@ const todoSchema = z.object({
   description: z.string().max(500).optional(),
   category_id: z.string().optional(),
   reminder_time: z.string().optional(),
-  recurrence_type: z.enum(["daily", "interval", "weekly", "monthly"]),
+  recurrence_type: z.enum(["one_time", "daily", "interval", "weekly", "monthly"]),
   recurrence_interval: z.number().int().min(2).max(365).optional(),
   recurrence_days: z.array(z.number()).optional(),
 });
@@ -75,7 +76,7 @@ export function AddTodoDialog() {
       description: "",
       category_id: "",
       reminder_time: "",
-      recurrence_type: "daily",
+      recurrence_type: "one_time",
       recurrence_interval: 2,
       recurrence_days: [],
     },
@@ -91,7 +92,10 @@ export function AddTodoDialog() {
       setValue("description", editingTodo.description || "");
       setValue("category_id", editingTodo.category_id || "");
       setValue("reminder_time", editingTodo.reminder_time || "");
-      setValue("recurrence_type", editingTodo.recurrence_type ?? "daily");
+      const recType = !editingTodo.is_recurring
+        ? "one_time"
+        : (editingTodo.recurrence_type ?? "daily");
+      setValue("recurrence_type", recType as TodoFormData["recurrence_type"]);
       setValue("recurrence_interval", editingTodo.recurrence_interval ?? 2);
       setValue("recurrence_days", editingTodo.recurrence_days ?? []);
     } else {
@@ -116,8 +120,13 @@ export function AddTodoDialog() {
   };
 
   const onSubmit = async (data: TodoFormData) => {
+    const isOneTime = data.recurrence_type === "one_time";
+    const actualRecurrenceType = (
+      isOneTime ? "daily" : data.recurrence_type
+    ) as "daily" | "interval" | "weekly" | "monthly";
     const recurrencePayload = {
-      recurrence_type: data.recurrence_type,
+      is_recurring: !isOneTime,
+      recurrence_type: actualRecurrenceType,
       recurrence_interval:
         data.recurrence_type === "interval" ? (data.recurrence_interval ?? 2) : 1,
       recurrence_days:
@@ -179,27 +188,33 @@ export function AddTodoDialog() {
 
           <div className="space-y-2">
             <Label>Category</Label>
-            <Select
-              onValueChange={(value) => setValue("category_id", value ?? undefined)}
-              defaultValue={editingTodo?.category_id || ""}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories?.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: cat.color }}
-                      />
-                      {cat.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Controller
+              name="category_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value ?? ""}
+                  onValueChange={(value) => field.onChange(value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories?.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: cat.color }}
+                          />
+                          {cat.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </div>
 
           <div className="space-y-2">
@@ -220,7 +235,7 @@ export function AddTodoDialog() {
               name="recurrence_type"
               control={control}
               render={({ field }) => (
-                <div className="grid grid-cols-4 gap-1 rounded-lg border p-1 bg-muted/50">
+                <div className="grid grid-cols-5 gap-1 rounded-lg border p-1 bg-muted/50">
                   {RECURRENCE_TYPES.map((rt) => (
                     <button
                       key={rt.value}

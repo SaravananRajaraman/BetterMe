@@ -2,11 +2,5 @@
   "buildCommand": "node scripts/generate-build-info.mjs && next build --webpack",
   "framework": "nextjs",
   "installCommand": "npm install",
-  "devCommand": "next dev --webpack",
-  "crons": [
-    {
-      "path": "/api/notifications/cron",
-      "schedule": "0 0 * * *"
-    }
-  ]
+  "devCommand": "next dev --webpack"
 }

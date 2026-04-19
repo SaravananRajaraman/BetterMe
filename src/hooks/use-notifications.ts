@@ -1,47 +1,21 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
-const supabase = createClient();
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+const NOTIFICATIONS_KEY = "notifications_enabled";
 
 export function useNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
+    if (typeof window === "undefined") return;
+    if ("Notification" in window) {
       setPermission(Notification.permission);
     }
-  }, []);
-
-  // Restore isSubscribed state from the browser's existing push subscription on mount
-  useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-    const checkExisting = async () => {
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          setIsSubscribed(true);
-        }
-      } catch {
-        // Service worker not available yet; leave as false
-      }
-    };
-    checkExisting();
+    const stored = localStorage.getItem(NOTIFICATIONS_KEY);
+    setIsEnabled(stored === "true" && Notification.permission === "granted");
   }, []);
 
   const requestPermission = useCallback(async () => {
@@ -49,101 +23,34 @@ export function useNotifications() {
       toast.error("This browser does not support notifications");
       return false;
     }
-
     const result = await Notification.requestPermission();
     setPermission(result);
     return result === "granted";
   }, []);
 
-  const subscribe = useCallback(async () => {
-    try {
-      const granted = await requestPermission();
-      if (!granted) return false;
-
-      const registration = await navigator.serviceWorker.ready;
-
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidKey) {
-        toast.error("Push notifications are not configured for this app");
-        return false;
-      }
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
-      });
-
-      // Save subscription to database
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return false;
-
-      const subJson = subscription.toJSON();
-      const p256dh = subJson.keys?.p256dh;
-      const auth = subJson.keys?.auth;
-
-      if (!p256dh || !auth) {
-        toast.error("Failed to enable notifications: invalid subscription keys");
-        return false;
-      }
-
-      const { error } = await supabase.from("push_subscriptions").upsert(
-        {
-          user_id: user.id,
-          endpoint: subscription.endpoint,
-          keys_p256dh: p256dh,
-          keys_auth: auth,
-        },
-        { onConflict: "user_id,endpoint" }
-      );
-
-      if (error) throw error;
-
-      setIsSubscribed(true);
-      toast.success("Notifications enabled!");
-      return true;
-    } catch (error) {
-      console.error("Failed to subscribe:", error);
-      toast.error("Failed to enable notifications");
-      return false;
+  const enable = useCallback(async () => {
+    const granted = await requestPermission();
+    if (!granted) {
+      toast.error("Please allow notifications in your browser settings");
+      return;
     }
+    localStorage.setItem(NOTIFICATIONS_KEY, "true");
+    setIsEnabled(true);
+    toast.success("Notifications enabled!");
   }, [requestPermission]);
 
-  const unsubscribe = useCallback(async () => {
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-
-      if (subscription) {
-        await subscription.unsubscribe();
-
-        // Remove from database
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          await supabase
-            .from("push_subscriptions")
-            .delete()
-            .eq("user_id", user.id)
-            .eq("endpoint", subscription.endpoint);
-        }
-      }
-
-      setIsSubscribed(false);
-      toast.success("Notifications disabled");
-    } catch (error) {
-      console.error("Failed to unsubscribe:", error);
-      toast.error("Failed to disable notifications");
-    }
+  const disable = useCallback(() => {
+    localStorage.removeItem(NOTIFICATIONS_KEY);
+    setIsEnabled(false);
+    toast.success("Notifications disabled");
   }, []);
 
   return {
     permission,
-    isSubscribed,
-    subscribe,
-    unsubscribe,
-    requestPermission,
+    isEnabled,
+    enable,
+    disable,
   };
 }
+
+

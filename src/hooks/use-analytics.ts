@@ -17,19 +17,20 @@ import type { DailySummary, StreakInfo } from "@/lib/types";
 
 const supabase = createClient();
 
-export function useWeeklyAnalytics() {
+export function useWeeklyAnalytics(weekStart?: Date) {
+  const resolvedWeekStart = weekStart ?? startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekStartStr = format(resolvedWeekStart, "yyyy-MM-dd");
+
   return useQuery({
-    queryKey: ["analytics", "weekly"],
+    queryKey: ["analytics", "weekly", weekStartStr],
     queryFn: async (): Promise<DailySummary[]> => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const today = new Date();
-      const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
-      const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+      const weekEnd = endOfWeek(resolvedWeekStart, { weekStartsOn: 1 });
+      const days = eachDayOfInterval({ start: resolvedWeekStart, end: weekEnd });
 
       // Get all todos count
       const { count: totalTodos } = await supabase
@@ -43,7 +44,7 @@ export function useWeeklyAnalytics() {
         .from("todo_completions")
         .select("*")
         .eq("user_id", user.id)
-        .gte("completed_date", format(weekStart, "yyyy-MM-dd"))
+        .gte("completed_date", format(resolvedWeekStart, "yyyy-MM-dd"))
         .lte("completed_date", format(weekEnd, "yyyy-MM-dd"));
 
       return days.map((day) => {

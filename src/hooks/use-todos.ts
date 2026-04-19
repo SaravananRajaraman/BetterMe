@@ -101,6 +101,7 @@ export function useCreateTodo() {
       description?: string;
       category_id?: string;
       reminder_time?: string;
+      is_recurring?: boolean;
       recurrence_type?: 'daily' | 'interval' | 'weekly' | 'monthly';
       recurrence_interval?: number;
       recurrence_days?: number[] | null;
@@ -122,6 +123,7 @@ export function useCreateTodo() {
           description: data.description || null,
           category_id: data.category_id || null,
           reminder_time: data.reminder_time || null,
+          is_recurring: data.is_recurring ?? true,
           recurrence_type: data.recurrence_type ?? 'daily',
           recurrence_interval: data.recurrence_interval ?? 1,
           recurrence_days: data.recurrence_days ?? null,
@@ -158,6 +160,7 @@ export function useUpdateTodo() {
       description?: string | null;
       category_id?: string | null;
       reminder_time?: string | null;
+      is_recurring?: boolean;
       recurrence_type?: 'daily' | 'interval' | 'weekly' | 'monthly';
       recurrence_interval?: number;
       recurrence_days?: number[] | null;
@@ -222,15 +225,17 @@ export function useToggleCompletion() {
       todoId,
       completed,
       skipped = false,
+      date,
     }: {
       todoId: string;
       completed: boolean;
       skipped?: boolean;
+      date?: string;
     }) => {
-      const today = format(new Date(), "yyyy-MM-dd");
+      const targetDate = date || format(new Date(), "yyyy-MM-dd");
 
       if (isGuestMode) {
-        toggleGuestCompletion(todoId, completed, skipped, today);
+        toggleGuestCompletion(todoId, completed, skipped, targetDate);
         return;
       }
 
@@ -243,7 +248,7 @@ export function useToggleCompletion() {
         const { error } = await supabase.from("todo_completions").insert({
           todo_id: todoId,
           user_id: user.id,
-          completed_date: today,
+          completed_date: targetDate,
           skipped,
         });
         if (error) throw error;
@@ -253,7 +258,7 @@ export function useToggleCompletion() {
           .delete()
           .eq("todo_id", todoId)
           .eq("user_id", user.id)
-          .eq("completed_date", today);
+          .eq("completed_date", targetDate);
         if (error) throw error;
       }
     },

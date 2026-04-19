@@ -56,9 +56,10 @@ function ordinal(n: number): string {
 
 interface TodoCardProps {
   todo: TodoWithCompletion;
+  date?: string;
 }
 
-export function TodoCard({ todo }: TodoCardProps) {
+export function TodoCard({ todo, date }: TodoCardProps) {
   const toggleCompletion = useToggleCompletion();
   const deleteTodo = useDeleteTodo();
   const setEditTodoId = useAppStore((s) => s.setEditTodoId);
@@ -70,15 +71,15 @@ export function TodoCard({ todo }: TodoCardProps) {
     toggleCompletion.mutate({
       todoId: todo.id,
       completed: !todo.completion,
+      date,
     });
   };
 
   const handleSkip = () => {
     if (isSkipped) {
-      // Unskip
-      toggleCompletion.mutate({ todoId: todo.id, completed: false });
+      toggleCompletion.mutate({ todoId: todo.id, completed: false, date });
     } else {
-      toggleCompletion.mutate({ todoId: todo.id, completed: true, skipped: true });
+      toggleCompletion.mutate({ todoId: todo.id, completed: true, skipped: true, date });
     }
   };
 

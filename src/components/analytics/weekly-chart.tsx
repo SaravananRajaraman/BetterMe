@@ -11,12 +11,17 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWeeklyAnalytics } from "@/hooks/use-analytics";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek, endOfWeek, addWeeks } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Target, Trophy } from "lucide-react";
+import { TrendingUp, Target, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export function WeeklyChart() {
-  const { data, isLoading } = useWeeklyAnalytics();
+  const [weekOffset, setWeekOffset] = useState(0);
+  const weekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+  const { data, isLoading } = useWeeklyAnalytics(weekStart);
 
   if (isLoading) {
     return (
@@ -99,8 +104,32 @@ export function WeeklyChart() {
 
       {/* Chart */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">Daily Completion Rate</CardTitle>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setWeekOffset((o) => o - 1)}
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground min-w-[120px] text-center">
+              {format(weekStart, "MMM d")} – {format(weekEnd, "MMM d, yyyy")}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setWeekOffset((o) => o + 1)}
+              disabled={weekOffset >= 0}
+              aria-label="Next week"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-[220px] sm:h-[280px]">

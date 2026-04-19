@@ -2,16 +2,20 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMonthlyAnalytics } from "@/hooks/use-analytics";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, TrendingUp, Hash } from "lucide-react";
+import { Calendar, TrendingUp, Hash, ChevronLeft, ChevronRight } from "lucide-react";
 import { MonthlyHeatmap } from "./monthly-heatmap";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export function MonthlyInsights() {
   const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const { data, isLoading } = useMonthlyAnalytics();
+  const [monthOffset, setMonthOffset] = useState(0);
+  const currentMonthDate = addMonths(now, monthOffset);
+  const currentMonth = currentMonthDate.getMonth();
+  const currentYear = currentMonthDate.getFullYear();
+  const { data, isLoading } = useMonthlyAnalytics(currentMonth, currentYear);
 
   if (isLoading) {
     return (
@@ -84,10 +88,31 @@ export function MonthlyInsights() {
 
       {/* Chart */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">
-            {format(new Date(), "MMMM yyyy")} — Habit Heatmap
+            {format(currentMonthDate, "MMMM yyyy")} — Habit Heatmap
           </CardTitle>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setMonthOffset((o) => o - 1)}
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setMonthOffset((o) => o + 1)}
+              disabled={monthOffset >= 0}
+              aria-label="Next month"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <MonthlyHeatmap

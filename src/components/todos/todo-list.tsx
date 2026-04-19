@@ -22,8 +22,8 @@ function TodoSkeleton() {
   );
 }
 
-export function TodoList() {
-  const { data: todos, isLoading, error } = useTodos();
+export function TodoList({ date }: { date?: string }) {
+  const { data: todos, isLoading, error } = useTodos(date);
   const selectedCategoryId = useAppStore((s) => s.selectedCategoryId);
 
   if (isLoading) return <TodoSkeleton />;
@@ -64,7 +64,7 @@ export function TodoList() {
       {incomplete.length > 0 && (
         <div className="space-y-2">
           {incomplete.map((todo) => (
-            <TodoCard key={todo.id} todo={todo} />
+            <TodoCard key={todo.id} todo={todo} date={date} />
           ))}
         </div>
       )}
@@ -76,7 +76,7 @@ export function TodoList() {
             Completed ({completed.length})
           </p>
           {completed.map((todo) => (
-            <TodoCard key={todo.id} todo={todo} />
+            <TodoCard key={todo.id} todo={todo} date={date} />
           ))}
         </div>
       )}
@@ -88,7 +88,7 @@ export function TodoList() {
             Skipped ({skipped.length})
           </p>
           {skipped.map((todo) => (
-            <TodoCard key={todo.id} todo={todo} />
+            <TodoCard key={todo.id} todo={todo} date={date} />
           ))}
         </div>
       )}

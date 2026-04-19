@@ -29,7 +29,7 @@ export default function SettingsPage() {
   const supabase = createClient();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { permission, isSubscribed, subscribe, unsubscribe } =
+  const { permission, isEnabled, enable, disable } =
     useNotifications();
 
   const { data: user } = useQuery({
@@ -197,9 +197,9 @@ export default function SettingsPage() {
               </p>
             </div>
             <Switch
-              checked={isSubscribed}
+              checked={isEnabled}
               onCheckedChange={(checked) =>
-                checked ? subscribe() : unsubscribe()
+                checked ? enable() : disable()
               }
               disabled={permission === "denied"}
             />
