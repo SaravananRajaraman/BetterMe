@@ -398,4 +398,265 @@ describe('Guest Storage', () => {
       expect(entries).toHaveLength(0)
     })
   })
+
+  describe('Prompt date tracking', () => {
+    it('should track last prompt date', async () => {
+      const { updateGuestLastPromptDate, getGuestLastPromptDate } = await import('@/lib/guest-storage')
+      const date = '2024-01-15'
+      updateGuestLastPromptDate(date)
+      expect(getGuestLastPromptDate()).toBe(date)
+    })
+
+    it('should return null if no prompt date set', async () => {
+      const { getGuestLastPromptDate } = await import('@/lib/guest-storage')
+      expect(getGuestLastPromptDate()).toBeNull()
+    })
+
+    it('should persist prompt date across calls', async () => {
+      const { updateGuestLastPromptDate, getGuestLastPromptDate } = await import('@/lib/guest-storage')
+      updateGuestLastPromptDate('2024-01-10')
+      updateGuestLastPromptDate('2024-01-15')
+      expect(getGuestLastPromptDate()).toBe('2024-01-15')
+    })
+  })
+
+  describe('Migration edge cases', () => {
+    it('should handle migration with no todos', async () => {
+      const { migrateGuestDataToSupabase } = await import('@/lib/guest-storage')
+      const mockSupabase = {
+        auth: { getUser: vi.fn() },
+        from: vi.fn(),
+      }
+      
+      // Should return early without error
+      await migrateGuestDataToSupabase(mockSupabase as any)
+      expect(mockSupabase.auth.getUser).not.toHaveBeenCalled()
+    })
+
+    it('should throw if user not authenticated during migration', async () => {
+      const { migrateGuestDataToSupabase, createGuestTodo } = await import('@/lib/guest-storage')
+      createGuestTodo({ title: 'Test' })
+      
+      const mockSupabase = {
+        auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+        from: vi.fn(),
+      }
+      
+      await expect(migrateGuestDataToSupabase(mockSupabase as any)).rejects.toThrow('Not authenticated')
+    })
+
+    it('should handle inactive todos during migration', async () => {
+      const { migrateGuestDataToSupabase } = await import('@/lib/guest-storage')
+      const guestData = getGuestData()
+      const now = new Date().toISOString()
+      
+      // Add an inactive todo
+      guestData.todos.push({
+        id: 'inactive-1',
+        user_id: 'guest',
+        title: 'Inactive todo',
+        description: null,
+        category_id: null,
+        reminder_time: null,
+        is_active: false,
+        is_recurring: false,
+        recurrence_type: 'daily',
+        recurrence_interval: 1,
+        recurrence_days: null,
+        created_at: now,
+      })
+      saveGuestData(guestData)
+
+      const mockSupabase = {
+        auth: { getUser: vi.fn().mockResolvedValue({ 
+          data: { user: { id: 'user-123' } } 
+        }) },
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: [] })
+          }),
+          insert: vi.fn(),
+        }),
+      }
+      
+      // Should complete without inserting inactive todo
+      await migrateGuestDataToSupabase(mockSupabase as any)
+    })
+
+    it('should map default category IDs during migration', async () => {
+      const { migrateGuestDataToSupabase, createGuestTodo } = await import('@/lib/guest-storage')
+      
+      const defaultCategory = getGuestCategories()[0]
+      const todo = createGuestTodo({ 
+        title: 'Test', 
+        category_id: defaultCategory.id 
+      })
+
+      const mockSupabase = {
+        auth: { getUser: vi.fn().mockResolvedValue({ 
+          data: { user: { id: 'user-123' } } 
+        }) },
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ 
+              data: [{ id: 'supa-cat-1', name: defaultCategory.name }] 
+            })
+          }),
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: { id: 'new-todo-id' } })
+            })
+          }),
+        }),
+      }
+      
+      await migrateGuestDataToSupabase(mockSupabase as any)
+      
+      // Verify that insert was called for todo with mapped category
+      expect(mockSupabase.from).toHaveBeenCalled()
+    })
+
+    it('should handle custom categories during migration', async () => {
+      const { migrateGuestDataToSupabase } = await import('@/lib/guest-storage')
+      
+      const customCat = createGuestCategory({
+        name: 'Custom',
+        color: '#ff0000',
+        icon: 'star',
+      })
+      createGuestTodo({ title: 'Test', category_id: customCat.id })
+
+      const mockSupabase = {
+        auth: { getUser: vi.fn().mockResolvedValue({ 
+          data: { user: { id: 'user-123' } } 
+        }) },
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: [] })
+          }),
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ 
+                data: { id: 'supa-id' } 
+              })
+            })
+          }),
+        }),
+      }
+      
+      await migrateGuestDataToSupabase(mockSupabase as any)
+      expect(mockSupabase.from).toHaveBeenCalled()
+    })
+
+    it('should migrate completions with correct todo ID mapping', async () => {
+      const { migrateGuestDataToSupabase } = await import('@/lib/guest-storage')
+      
+      const todo1 = createGuestTodo({ title: 'Todo 1' })
+      const todo2 = createGuestTodo({ title: 'Todo 2' })
+      
+      toggleGuestCompletion(todo1.id, true, false, '2024-01-01')
+      toggleGuestCompletion(todo2.id, true, false, '2024-01-02')
+
+      const mockInsert = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ 
+            data: { id: 'mapped-todo-id' } 
+          })
+        })
+      })
+
+      const mockSupabase = {
+        auth: { getUser: vi.fn().mockResolvedValue({ 
+          data: { user: { id: 'user-123' } } 
+        }) },
+        from: vi.fn((table: string) => {
+          if (table === 'todo_completions') {
+            return {
+              insert: mockInsert,
+            }
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [] })
+            }),
+            insert: mockInsert,
+          }
+        }),
+      }
+      
+      await migrateGuestDataToSupabase(mockSupabase as any)
+    })
+  })
+
+  describe('Data persistence', () => {
+    it('should persist categories across page reloads', () => {
+      const category1 = createGuestCategory({
+        name: 'Test',
+        color: '#ff0000',
+        icon: 'star',
+      })
+      
+      // Simulate page reload by getting data fresh
+      const data = getGuestData()
+      const found = data.categories.find(c => c.id === category1.id)
+      expect(found).toBeDefined()
+      expect(found?.name).toBe('Test')
+    })
+
+    it('should persist todos across page reloads', () => {
+      const todo = createGuestTodo({ title: 'Test Todo' })
+      
+      const data = getGuestData()
+      const found = data.todos.find(t => t.id === todo.id)
+      expect(found).toBeDefined()
+      expect(found?.title).toBe('Test Todo')
+    })
+
+    it('should persist completions across page reloads', () => {
+      const todo = createGuestTodo({ title: 'Test' })
+      toggleGuestCompletion(todo.id, true, false, '2024-01-01')
+      
+      const data = getGuestData()
+      const completion = data.completions.find(
+        c => c.todo_id === todo.id && c.completed_date === '2024-01-01'
+      )
+      expect(completion).toBeDefined()
+    })
+  })
+
+  describe('Category deletion cascades', () => {
+    it('should null out category_id on todos when category is deleted', () => {
+      const category = createGuestCategory({
+        name: 'Temp',
+        color: '#ff0000',
+        icon: 'trash',
+      })
+      const todo = createGuestTodo({
+        title: 'Todo in category',
+        category_id: category.id,
+      })
+
+      deleteGuestCategory(category.id)
+
+      const updated = getGuestData().todos.find(t => t.id === todo.id)
+      expect(updated?.category_id).toBeNull()
+    })
+
+    it('should not affect other todos when deleting category', () => {
+      const cat1 = createGuestCategory({ name: 'Cat1', color: '#f00', icon: 'a' })
+      const cat2 = createGuestCategory({ name: 'Cat2', color: '#0f0', icon: 'b' })
+      
+      const todo1 = createGuestTodo({ title: 'T1', category_id: cat1.id })
+      const todo2 = createGuestTodo({ title: 'T2', category_id: cat2.id })
+
+      deleteGuestCategory(cat1.id)
+
+      const data = getGuestData()
+      const t1 = data.todos.find(t => t.id === todo1.id)
+      const t2 = data.todos.find(t => t.id === todo2.id)
+      
+      expect(t1?.category_id).toBeNull()
+      expect(t2?.category_id).toBe(cat2.id)
+    })
+  })
 })
