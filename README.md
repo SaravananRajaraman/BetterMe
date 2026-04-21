@@ -34,9 +34,11 @@ npm run test:e2e:ui
 ```
 
 **Current Test Coverage**:
-- 188 unit tests
-- 71.42% statement coverage
-- 8 files at 100% coverage
+- 529 unit tests across 33 test files
+- 67.84% statement coverage
+- 61.16% branch coverage
+- 58.94% function coverage
+- 69.52% line coverage
 - Multiple E2E test suites
 
 ## Getting Started
