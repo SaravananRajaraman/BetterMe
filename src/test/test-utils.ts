@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, createElement } from 'react'
 import { render, RenderOptions } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi } from 'vitest'
@@ -31,9 +31,8 @@ export const renderWithProviders = (
     queryClient?: QueryClient
   } = {}
 ) => {
-  const Wrapper = ({ children }: any) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  )
+  const Wrapper = ({ children }: any) =>
+    createElement(QueryClientProvider, { client: queryClient }, children)
 
   return {
     ...render(ui, { wrapper: Wrapper, ...renderOptions }),
