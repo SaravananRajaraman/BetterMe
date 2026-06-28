@@ -2,14 +2,20 @@
 -- Reminder push scheduling (pg_cron + pg_net)
 -- ----------------------------------------------------------------------------
 -- Runs every minute and POSTs to the app's reminder dispatcher
--- (/api/notifications/cron), which decides who to notify. Secrets are read from
--- database settings so they are NOT committed here.
+-- (/api/notifications/cron), which decides who to notify.
 --
--- One-time setup (run once, with your real values — e.g. in the SQL editor):
---   alter database postgres set "app.settings.site_url"   = 'https://your-app.vercel.app';
---   alter database postgres set "app.settings.cron_secret" = 'your-CRON_SECRET';
+-- Before running, replace the two placeholders below with your real values:
+--   <SITE_URL>     e.g. https://your-app.vercel.app   (no trailing slash)
+--   <CRON_SECRET>  the same value set in the app's CRON_SECRET env var
 --
--- Then run this file.
+-- NOTE: the managed-Supabase Postgres role cannot `ALTER DATABASE ... SET`, so
+-- database-level GUC settings (e.g. app.settings.cron_secret) are not an option
+-- here — the URL and secret are inlined into the job definition instead. The
+-- secret therefore lives in `cron.job.command` (readable with privileged DB
+-- access). For stronger isolation, store it in Supabase Vault and read it via
+-- `vault.decrypted_secrets` inside the job body.
+--
+-- Run this in the Supabase SQL editor after editing the placeholders.
 -- ============================================================================
 
 create extension if not exists pg_cron;
@@ -24,10 +30,10 @@ select cron.schedule(
   '* * * * *',
   $$
   select net.http_post(
-    url := current_setting('app.settings.site_url') || '/api/notifications/cron',
+    url := '<SITE_URL>/api/notifications/cron',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || current_setting('app.settings.cron_secret')
+      'Authorization', 'Bearer <CRON_SECRET>'
     ),
     body := '{}'::jsonb
   );

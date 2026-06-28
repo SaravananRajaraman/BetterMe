@@ -135,14 +135,22 @@ Supabase setup.
   `Authorization: Bearer <CRON_SECRET>` and the route rejects anything else.
 
 **Supabase scheduling** (SQL Editor, once):
-1. Point the scheduler at your deployment and secret:
-   ```sql
-   alter database postgres set "app.settings.site_url"    = 'https://your-app.vercel.app';
-   alter database postgres set "app.settings.cron_secret" = 'your-CRON_SECRET';
-   ```
-2. Run `supabase/migrations/0001_reminders_cron.sql` — it enables the `pg_cron`
-   and `pg_net` extensions and schedules the every-minute call to
-   `/api/notifications/cron`.
+1. Open `supabase/migrations/0001_reminders_cron.sql` and replace the
+   `<SITE_URL>` and `<CRON_SECRET>` placeholders with your deployment URL and the
+   same `CRON_SECRET` value from above.
+2. Run it. It enables the `pg_cron` and `pg_net` extensions and schedules the
+   every-minute call to `/api/notifications/cron`.
+
+   (Managed Supabase blocks `ALTER DATABASE ... SET`, so the URL and secret are
+   inlined into the job rather than read from a database setting.)
+
+**Verify** it's working:
+```sql
+-- the job exists and is active
+select jobname, schedule, active from cron.job where jobname = 'send-reminders';
+-- recent calls should return 200 once the app is deployed
+select status_code, content, created from net._http_response order by created desc limit 5;
+```
 
 Once a signed-in user enables notifications in Settings, their device is
 registered (a row appears in `push_subscriptions`) and reminders are delivered
