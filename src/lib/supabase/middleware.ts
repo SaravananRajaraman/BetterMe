@@ -43,7 +43,12 @@ export async function updateSession(request: NextRequest) {
   // Allow guest mode through protected routes
   const isGuestMode = request.cookies.get("guest_mode")?.value === "true";
 
-  if (!user && !isPublicPath && !isGuestMode) {
+  // API routes enforce their own auth (user session or CRON_SECRET) and must
+  // never be redirected to /login — that would break the reminder cron, which
+  // calls /api/notifications/cron server-to-server with no session.
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
+
+  if (!user && !isPublicPath && !isGuestMode && !isApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
