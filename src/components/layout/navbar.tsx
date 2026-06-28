@@ -10,6 +10,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
+import { useAppStore } from "@/stores/app-store";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -22,6 +23,12 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const isGuestMode = useAppStore((s) => s.isGuestMode);
+
+  // Analytics requires a signed-in account; hide it from guests.
+  const visibleNavItems = navItems.filter(
+    (item) => !(isGuestMode && item.href === "/analytics")
+  );
 
   const { data: user } = useQuery({
     queryKey: ["user"],
@@ -62,7 +69,7 @@ export function Navbar() {
 
           {/* Nav items */}
           <nav className="flex-1 px-3 py-4 space-y-1">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
@@ -110,7 +117,7 @@ export function Navbar() {
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="flex items-center justify-around h-16 px-2">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link

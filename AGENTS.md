@@ -36,9 +36,9 @@ Note: both `dev` and `build` run `scripts/generate-build-info.mjs` first — `--
 ## Conventions
 
 - **Path alias** — `@/*` → `src/*` (mirrored in `tsconfig.json` and `vitest.config.ts`).
-- **Validation** — pure functions in `src/lib/validation.ts` (`validateEmail`, `validatePassword`, `validateTitle`, `validateWeight`, `validateDate`, `validateAuthFormData`). Forms use react-hook-form + zod resolvers.
+- **Validation** — forms validate with react-hook-form + zod resolvers (schemas defined alongside each form).
 - **Constants** — default categories and color maps in `src/lib/constants.ts`. Don't hardcode category colors elsewhere.
-- **Analytics math** — pure helpers in `src/lib/analytics-calculations.ts` (trends, averages, completion rates, streaks). Keep it pure and testable.
+- **Analytics math** — pure helpers in `src/lib/analytics-calculations.ts`: recurrence/scheduling (`shouldShowTodoOnDate`, `isTodoScheduledOnDate`), per-day completion summaries (`computeDailySummary`), and streaks (`computeStreaks`). Keep it pure and testable.
 
 ## Testing
 

@@ -1,6 +1,6 @@
 import type { Category, Todo, TodoCompletion, TodoWithCompletion, WeightEntry } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { shouldShowTodoOnDate } from "@/hooks/use-todos";
+import { isTodoScheduledOnDate } from "@/lib/analytics-calculations";
 
 const GUEST_STORAGE_KEY = "betterme-guest-data";
 
@@ -57,7 +57,15 @@ export function clearGuestData(): void {
 export function getGuestTodosForDate(date: string): TodoWithCompletion[] {
   const data = getGuestData();
   return data.todos
-    .filter((t) => t.is_active && shouldShowTodoOnDate(t, date))
+    .filter(
+      (t) =>
+        t.is_active &&
+        isTodoScheduledOnDate(
+          t,
+          date,
+          data.completions.filter((c) => c.todo_id === t.id)
+        )
+    )
     .map((todo) => {
       const completion =
         data.completions.find(

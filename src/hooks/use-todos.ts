@@ -2,10 +2,14 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { format, parseISO, differenceInCalendarDays, getDay, getDate } from "date-fns";
-import type { Todo, TodoWithCompletion } from "@/lib/types";
+import { format } from "date-fns";
+import type { TodoCompletion, TodoWithCompletion } from "@/lib/types";
 import { toast } from "sonner";
 import { useAppStore } from "@/stores/app-store";
+import {
+  isTodoScheduledOnDate,
+  shouldShowTodoOnDate,
+} from "@/lib/analytics-calculations";
 import {
   getGuestTodosForDate,
   createGuestTodo,
@@ -14,28 +18,9 @@ import {
   toggleGuestCompletion,
 } from "@/lib/guest-storage";
 
-/**
- * Determines whether a recurring todo should appear on a given date
- * based on its recurrence configuration.
- */
-export function shouldShowTodoOnDate(todo: Todo, date: string): boolean {
-  if (!todo.is_recurring) return true; // one-time todos always show
-  const type = todo.recurrence_type ?? 'daily';
-  if (type === 'daily') return true;
-  if (type === 'interval') {
-    const diff = differenceInCalendarDays(parseISO(date), parseISO(todo.created_at));
-    return diff >= 0 && diff % (todo.recurrence_interval ?? 1) === 0;
-  }
-  if (type === 'weekly') {
-    const dow = getDay(parseISO(date)); // 0=Sun…6=Sat
-    return (todo.recurrence_days ?? []).includes(dow);
-  }
-  if (type === 'monthly') {
-    const dom = getDate(parseISO(date)); // 1-31
-    return (todo.recurrence_days ?? []).includes(dom);
-  }
-  return true;
-}
+// Re-exported so existing importers keep working after the recurrence logic
+// moved to the pure analytics-calculations module.
+export { shouldShowTodoOnDate };
 
 const supabase = createClient();
 
@@ -80,13 +65,38 @@ export function useTodos(date?: string) {
 
       if (compError) throw compError;
 
-      // Merge todos with their categories and completions, filtered by recurrence
-      return (todos || []).filter((todo) => shouldShowTodoOnDate(todo, today)).map((todo) => ({
-        ...todo,
-        category: categories?.find((c) => c.id === todo.category_id) || null,
-        completion:
-          completions?.find((c) => c.todo_id === todo.id) || null,
-      }));
+      // For one-time todos, fetch completions before today so the "stays until
+      // done" rule can hide ones already resolved on an earlier date.
+      const oneTimeIds = (todos || [])
+        .filter((t) => !t.is_recurring)
+        .map((t) => t.id);
+      let priorCompletions: TodoCompletion[] = [];
+      if (oneTimeIds.length > 0) {
+        const { data } = await supabase
+          .from("todo_completions")
+          .select("*")
+          .eq("user_id", user.id)
+          .in("todo_id", oneTimeIds)
+          .lt("completed_date", today);
+        priorCompletions = data ?? [];
+      }
+
+      // Merge todos with their categories and completions, filtered by schedule.
+      return (todos || [])
+        .filter((todo) =>
+          isTodoScheduledOnDate(
+            todo,
+            today,
+            todo.is_recurring
+              ? []
+              : priorCompletions.filter((c) => c.todo_id === todo.id)
+          )
+        )
+        .map((todo) => ({
+          ...todo,
+          category: categories?.find((c) => c.id === todo.category_id) || null,
+          completion: completions?.find((c) => c.todo_id === todo.id) || null,
+        }));
     },
   });
 }

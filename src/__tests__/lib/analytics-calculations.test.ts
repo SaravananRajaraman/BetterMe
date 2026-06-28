@@ -1,255 +1,233 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import {
+  shouldShowTodoOnDate,
+  isTodoScheduledOnDate,
+  computeDailySummary,
+  computeStreaks,
+} from '@/lib/analytics-calculations'
+import type { Todo, TodoCompletion } from '@/lib/types'
 
-/**
- * Test utilities for date-based calculations used in weight/analytics
- */
+const makeTodo = (overrides: Partial<Todo> = {}): Todo => ({
+  id: 'todo-1',
+  user_id: 'user-1',
+  title: 'Test',
+  description: null,
+  category_id: null,
+  reminder_time: null,
+  is_recurring: true,
+  recurrence_type: 'daily',
+  recurrence_interval: 1,
+  recurrence_days: null,
+  is_active: true,
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
+  ...overrides,
+})
 
-export function calculateAveragWeight(entries: Array<{ weight: number }>): number {
-  if (entries.length === 0) return 0
-  const sum = entries.reduce((acc, entry) => acc + entry.weight, 0)
-  return Math.round((sum / entries.length) * 10) / 10
-}
+const makeCompletion = (
+  overrides: Partial<TodoCompletion> = {}
+): TodoCompletion => ({
+  id: `comp-${Math.random()}`,
+  todo_id: 'todo-1',
+  user_id: 'user-1',
+  completed_date: '2024-01-01',
+  completed_at: '2024-01-01T08:00:00Z',
+  skipped: false,
+  ...overrides,
+})
 
-export function calculateWeightTrend(
-  entries: Array<{ weight: number; date: string }>
-): 'gaining' | 'losing' | 'stable' {
-  if (entries.length < 2) return 'stable'
-
-  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
-  const first = sorted[0].weight
-  const last = sorted[sorted.length - 1].weight
-
-  if (last > first + 1) return 'gaining'
-  if (last < first - 1) return 'losing'
-  return 'stable'
-}
-
-export function getWeeklyAverage(
-  entries: Array<{ weight: number; date: string }>,
-  endDate: string
-): number {
-  const startDate = new Date(endDate)
-  startDate.setDate(startDate.getDate() - 7)
-
-  const weekEntries = entries.filter((e) => {
-    const entryDate = new Date(e.date)
-    return entryDate >= startDate && entryDate <= new Date(endDate)
+describe('shouldShowTodoOnDate', () => {
+  it('always shows non-recurring todos (recurrence handled elsewhere)', () => {
+    expect(shouldShowTodoOnDate(makeTodo({ is_recurring: false }), '2030-05-05')).toBe(true)
   })
 
-  return calculateAveragWeight(weekEntries)
-}
+  it('shows daily todos every day', () => {
+    expect(shouldShowTodoOnDate(makeTodo({ recurrence_type: 'daily' }), '2024-06-15')).toBe(true)
+  })
 
-export function getTodoCompletionRate(
-  completions: Array<{ todo_id: string; completed_date: string }>,
-  todos: Array<{ id: string }>
-): number {
-  if (todos.length === 0) return 0
-  const uniqueTodoIds = new Set(todos.map((t) => t.id))
-  const completedTodos = new Set(completions.map((c) => c.todo_id))
+  it('treats a missing recurrence_type as daily', () => {
+    const todo = makeTodo({ recurrence_type: null as unknown as 'daily' })
+    expect(shouldShowTodoOnDate(todo, '2024-06-15')).toBe(true)
+  })
 
-  const completed = Array.from(uniqueTodoIds).filter((id) => completedTodos.has(id)).length
-  return Math.round((completed / uniqueTodoIds.size) * 100)
-}
-
-export function getStreakDays(
-  completions: Array<{ completed_date: string }>,
-  today: string
-): number {
-  if (completions.length === 0) return 0
-
-  const sorted = [...completions]
-    .map((c) => new Date(c.completed_date))
-    .sort((a, b) => b.getTime() - a.getTime())
-
-  let streak = 0
-  let currentDate = new Date(today)
-
-  for (const completionDate of sorted) {
-    const diffDays = Math.floor(
-      (currentDate.getTime() - completionDate.getTime()) / (1000 * 60 * 60 * 24)
-    )
-
-    if (diffDays === 0 || diffDays === 1) {
-      streak++
-      currentDate = new Date(completionDate)
-    } else {
-      break
-    }
-  }
-
-  return streak
-}
-
-// ============ TESTS ============
-
-describe('Weight Calculations', () => {
-  describe('calculateAveragWeight', () => {
-    it('should calculate average of multiple weights', () => {
-      const entries = [{ weight: 70 }, { weight: 72 }, { weight: 68 }]
-      const avg = calculateAveragWeight(entries)
-      expect(avg).toBe(70)
+  describe('interval', () => {
+    const todo = makeTodo({ recurrence_type: 'interval', recurrence_interval: 3 })
+    it('shows on the created day and every Nth day after', () => {
+      expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(true)
+      expect(shouldShowTodoOnDate(todo, '2024-01-02')).toBe(false)
+      expect(shouldShowTodoOnDate(todo, '2024-01-04')).toBe(true)
     })
-
-    it('should return 0 for empty list', () => {
-      expect(calculateAveragWeight([])).toBe(0)
+    it('does not show before the created day', () => {
+      expect(shouldShowTodoOnDate(todo, '2023-12-31')).toBe(false)
     })
-
-    it('should round to one decimal place', () => {
-      const entries = [{ weight: 70.1 }, { weight: 70.2 }, { weight: 70.3 }]
-      const avg = calculateAveragWeight(entries)
-      expect(avg).toBe(70.2)
-    })
-
-    it('should handle single entry', () => {
-      const entries = [{ weight: 75.5 }]
-      expect(calculateAveragWeight(entries)).toBe(75.5)
+    it('defaults a missing interval to 1 (daily)', () => {
+      const t = makeTodo({
+        recurrence_type: 'interval',
+        recurrence_interval: null as unknown as number,
+      })
+      expect(shouldShowTodoOnDate(t, '2024-01-02')).toBe(true)
     })
   })
 
-  describe('calculateWeightTrend', () => {
-    it('should detect gaining trend', () => {
-      const entries = [
-        { weight: 70, date: '2024-01-01' },
-        { weight: 75, date: '2024-01-31' },
-      ]
-      expect(calculateWeightTrend(entries)).toBe('gaining')
+  describe('weekly', () => {
+    it('shows only on listed weekdays', () => {
+      const todo = makeTodo({ recurrence_type: 'weekly', recurrence_days: [1, 3] }) // Mon, Wed
+      expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(true) // Monday
+      expect(shouldShowTodoOnDate(todo, '2024-01-02')).toBe(false) // Tuesday
+      expect(shouldShowTodoOnDate(todo, '2024-01-03')).toBe(true) // Wednesday
     })
-
-    it('should detect losing trend', () => {
-      const entries = [
-        { weight: 75, date: '2024-01-01' },
-        { weight: 70, date: '2024-01-31' },
-      ]
-      expect(calculateWeightTrend(entries)).toBe('losing')
-    })
-
-    it('should detect stable trend', () => {
-      const entries = [
-        { weight: 70, date: '2024-01-01' },
-        { weight: 70.5, date: '2024-01-31' },
-      ]
-      expect(calculateWeightTrend(entries)).toBe('stable')
-    })
-
-    it('should return stable for single entry', () => {
-      const entries = [{ weight: 70, date: '2024-01-01' }]
-      expect(calculateWeightTrend(entries)).toBe('stable')
-    })
-
-    it('should return stable for empty list', () => {
-      expect(calculateWeightTrend([])).toBe('stable')
+    it('shows nothing when recurrence_days is null', () => {
+      const todo = makeTodo({ recurrence_type: 'weekly', recurrence_days: null })
+      expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(false)
     })
   })
 
-  describe('getWeeklyAverage', () => {
-    it('should calculate average for entries within week', () => {
-      const entries = [
-        { weight: 70, date: '2024-01-25' },
-        { weight: 72, date: '2024-01-26' },
-        { weight: 74, date: '2024-01-31' },
-      ]
-      const avg = getWeeklyAverage(entries, '2024-01-31')
-      expect(avg).toBe(72)
+  describe('monthly', () => {
+    it('shows on the matching day of month', () => {
+      const todo = makeTodo({ recurrence_type: 'monthly', recurrence_days: [15] })
+      expect(shouldShowTodoOnDate(todo, '2024-01-15')).toBe(true)
+      expect(shouldShowTodoOnDate(todo, '2024-01-16')).toBe(false)
     })
-
-    it('should exclude entries outside week range', () => {
-      const entries = [
-        { weight: 80, date: '2024-01-20' }, // Before week
-        { weight: 70, date: '2024-01-25' },
-        { weight: 72, date: '2024-01-31' },
-      ]
-      const avg = getWeeklyAverage(entries, '2024-01-31')
-      expect(avg).toBe(71)
+    it('clamps an overrunning day to the last day of the month', () => {
+      const todo = makeTodo({ recurrence_type: 'monthly', recurrence_days: [31] })
+      expect(shouldShowTodoOnDate(todo, '2024-01-31')).toBe(true) // 31 exists
+      expect(shouldShowTodoOnDate(todo, '2024-02-29')).toBe(true) // clamps to Feb 29
+      expect(shouldShowTodoOnDate(todo, '2024-02-28')).toBe(false) // not the last day
     })
-
-    it('should return 0 for no entries in week', () => {
-      const entries = [{ weight: 70, date: '2024-01-01' }]
-      const avg = getWeeklyAverage(entries, '2024-01-31')
-      expect(avg).toBe(0)
+    it('shows nothing when recurrence_days is null', () => {
+      const todo = makeTodo({ recurrence_type: 'monthly', recurrence_days: null })
+      expect(shouldShowTodoOnDate(todo, '2024-01-01')).toBe(false)
     })
   })
 })
 
-describe('Todo Metrics', () => {
-  describe('getTodoCompletionRate', () => {
-    it('should calculate completion percentage', () => {
-      const todos = [
-        { id: '1' },
-        { id: '2' },
-        { id: '3' },
-        { id: '4' },
-      ]
-      const completions = [
-        { todo_id: '1', completed_date: '2024-01-01' },
-        { todo_id: '2', completed_date: '2024-01-01' },
-      ]
-      const rate = getTodoCompletionRate(completions, todos)
-      expect(rate).toBe(50)
-    })
+describe('isTodoScheduledOnDate', () => {
+  it('returns false before the todo was created', () => {
+    const todo = makeTodo({ created_at: '2024-02-01T00:00:00Z' })
+    expect(isTodoScheduledOnDate(todo, '2024-01-15', [])).toBe(false)
+  })
 
-    it('should return 0 when no todos', () => {
-      const completions = [{ todo_id: '1', completed_date: '2024-01-01' }]
-      expect(getTodoCompletionRate(completions, [])).toBe(0)
-    })
+  it('delegates to recurrence for recurring todos', () => {
+    const todo = makeTodo({ recurrence_type: 'daily' })
+    expect(isTodoScheduledOnDate(todo, '2024-01-05', [])).toBe(true)
+  })
 
-    it('should return 100 when all completed', () => {
-      const todos = [{ id: '1' }, { id: '2' }]
-      const completions = [
-        { todo_id: '1', completed_date: '2024-01-01' },
-        { todo_id: '2', completed_date: '2024-01-01' },
-      ]
-      expect(getTodoCompletionRate(completions, todos)).toBe(100)
+  describe('one-time "stays until done"', () => {
+    const oneTime = makeTodo({ is_recurring: false })
+    it('stays visible while unresolved', () => {
+      expect(isTodoScheduledOnDate(oneTime, '2024-01-10', [])).toBe(true)
     })
+    it('hides once resolved on an earlier date', () => {
+      const completions = [makeCompletion({ completed_date: '2024-01-05' })]
+      expect(isTodoScheduledOnDate(oneTime, '2024-01-10', completions)).toBe(false)
+    })
+    it('still shows on its own completion date', () => {
+      const completions = [makeCompletion({ completed_date: '2024-01-10' })]
+      expect(isTodoScheduledOnDate(oneTime, '2024-01-10', completions)).toBe(true)
+    })
+  })
+})
 
-    it('should handle duplicates in completions', () => {
-      const todos = [{ id: '1' }, { id: '2' }]
-      const completions = [
-        { todo_id: '1', completed_date: '2024-01-01' },
-        { todo_id: '1', completed_date: '2024-01-02' },
-        { todo_id: '2', completed_date: '2024-01-01' },
-      ]
-      expect(getTodoCompletionRate(completions, todos)).toBe(100)
+describe('computeDailySummary', () => {
+  it('counts only todos scheduled that day, with a consistent rate', () => {
+    const daily = makeTodo({ id: 'A', recurrence_type: 'daily' })
+    const weeklyMon = makeTodo({
+      id: 'B',
+      recurrence_type: 'weekly',
+      recurrence_days: [1],
+    })
+    const oneTime = makeTodo({ id: 'C', is_recurring: false })
+    const completions: TodoCompletion[] = [
+      makeCompletion({ todo_id: 'A', completed_date: '2024-01-01' }),
+      // a second row for A exercises the group-by accumulation path
+      makeCompletion({ todo_id: 'A', completed_date: '2024-01-02' }),
+      makeCompletion({ todo_id: 'B', completed_date: '2024-01-01', skipped: true }),
+    ]
+
+    // 2024-01-01 is a Monday
+    const summary = computeDailySummary([daily, weeklyMon, oneTime], completions, '2024-01-01')
+    expect(summary).toEqual({
+      date: '2024-01-01',
+      totalTodos: 3,
+      completedCount: 1, // A
+      skippedCount: 1, // B
+      missedCount: 1, // C
+      completionRate: 33,
     })
   })
 
-  describe('getStreakDays', () => {
-    it('should calculate current streak', () => {
-      const completions = [
-        { completed_date: '2024-01-31' },
-        { completed_date: '2024-01-30' },
-        { completed_date: '2024-01-29' },
-      ]
-      const streak = getStreakDays(completions, '2024-01-31')
-      expect(streak).toBe(3)
-    })
+  it('excludes completions for todos not scheduled that day', () => {
+    const daily = makeTodo({ id: 'A', recurrence_type: 'daily' })
+    const completions = [
+      makeCompletion({ todo_id: 'A', completed_date: '2024-01-01' }),
+      // orphaned completion for an unknown todo
+      makeCompletion({ todo_id: 'ghost', completed_date: '2024-01-01' }),
+    ]
+    const summary = computeDailySummary([daily], completions, '2024-01-01')
+    expect(summary.totalTodos).toBe(1)
+    expect(summary.completedCount).toBe(1)
+    expect(summary.completionRate).toBe(100)
+  })
 
-    it('should break streak on gap', () => {
-      const completions = [
-        { completed_date: '2024-01-31' },
-        { completed_date: '2024-01-30' },
-        { completed_date: '2024-01-28' }, // Gap on Jan 29
-      ]
-      const streak = getStreakDays(completions, '2024-01-31')
-      expect(streak).toBe(2)
+  it('returns a 0% rate when nothing is scheduled', () => {
+    const summary = computeDailySummary([], [], '2024-01-01')
+    expect(summary).toEqual({
+      date: '2024-01-01',
+      totalTodos: 0,
+      completedCount: 0,
+      skippedCount: 0,
+      missedCount: 0,
+      completionRate: 0,
     })
+  })
+})
 
-    it('should return 0 for no completions', () => {
-      expect(getStreakDays([], '2024-01-31')).toBe(0)
-    })
+describe('computeStreaks', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2024-01-31T12:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
-    it('should handle single completion', () => {
-      const completions = [{ completed_date: '2024-01-31' }]
-      expect(getStreakDays(completions, '2024-01-31')).toBe(1)
+  it('returns zeros for no completions', () => {
+    expect(computeStreaks([])).toEqual({
+      currentStreak: 0,
+      longestStreak: 0,
+      lastCompletedDate: null,
     })
+  })
 
-    it('should handle completed yesterday', () => {
-      const completions = [{ completed_date: '2024-01-30' }]
-      expect(getStreakDays(completions, '2024-01-31')).toBe(1)
+  it('counts a consecutive run ending today and dedupes dates', () => {
+    const result = computeStreaks([
+      '2024-01-31',
+      '2024-01-31',
+      '2024-01-30',
+      '2024-01-29',
+    ])
+    expect(result).toEqual({
+      currentStreak: 3,
+      longestStreak: 3,
+      lastCompletedDate: '2024-01-31',
     })
+  })
 
-    it('should break streak for old dates', () => {
-      const completions = [{ completed_date: '2024-01-20' }]
-      expect(getStreakDays(completions, '2024-01-31')).toBe(0)
-    })
+  it('breaks the current streak on a gap', () => {
+    const result = computeStreaks(['2024-01-31', '2024-01-29'])
+    expect(result.currentStreak).toBe(1)
+    expect(result.longestStreak).toBe(1)
+  })
+
+  it('counts a streak that ends yesterday', () => {
+    const result = computeStreaks(['2024-01-30'])
+    expect(result.currentStreak).toBe(1)
+  })
+
+  it('reports no current streak when the latest completion is older', () => {
+    const result = computeStreaks(['2024-01-20'])
+    expect(result.currentStreak).toBe(0)
+    expect(result.longestStreak).toBe(1)
+    expect(result.lastCompletedDate).toBe('2024-01-20')
   })
 })

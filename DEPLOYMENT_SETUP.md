@@ -122,6 +122,32 @@ Private Key: ABC123...
 
 Save both values — you'll need them in the next section.
 
+### Enable server-side reminder delivery
+
+Reminders are delivered via Web Push by a job that runs every minute, so they
+fire even when the app is closed. This needs two extra env vars and a one-time
+Supabase setup.
+
+**Env vars** (in `.env.local` and Vercel):
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase Dashboard → Project Settings → API →
+  `service_role` key. Server-only; lets the cron read every user's reminders.
+- `CRON_SECRET` — any random string; the scheduler sends it as
+  `Authorization: Bearer <CRON_SECRET>` and the route rejects anything else.
+
+**Supabase scheduling** (SQL Editor, once):
+1. Point the scheduler at your deployment and secret:
+   ```sql
+   alter database postgres set "app.settings.site_url"    = 'https://your-app.vercel.app';
+   alter database postgres set "app.settings.cron_secret" = 'your-CRON_SECRET';
+   ```
+2. Run `supabase/migrations/0001_reminders_cron.sql` — it enables the `pg_cron`
+   and `pg_net` extensions and schedules the every-minute call to
+   `/api/notifications/cron`.
+
+Once a signed-in user enables notifications in Settings, their device is
+registered (a row appears in `push_subscriptions`) and reminders are delivered
+server-side. Guests are not push-subscribed and fall back to in-tab reminders.
+
 ---
 
 ## Local Testing

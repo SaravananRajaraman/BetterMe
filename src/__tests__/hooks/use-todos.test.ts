@@ -230,8 +230,10 @@ describe('shouldShowTodoOnDate', () => {
         recurrence_days: [31],
       })
       expect(shouldShowTodoOnDate(todo, '2024-01-31')).toBe(true)
-      // February only has 29 days in 2024
-      expect(shouldShowTodoOnDate(todo, '2024-02-29')).toBe(false)
+      // Day 31 clamps to the month's last day, so it shows on Feb 29 (2024)
+      expect(shouldShowTodoOnDate(todo, '2024-02-29')).toBe(true)
+      // ...but not on earlier February days
+      expect(shouldShowTodoOnDate(todo, '2024-02-28')).toBe(false)
     })
   })
 
@@ -259,10 +261,10 @@ describe('shouldShowTodoOnDate', () => {
         recurrence_type: 'monthly',
         recurrence_days: [29],
       })
-      // 2024-02-29 is leap day
+      // 2024-02-29 is leap day — day 29 exists
       expect(shouldShowTodoOnDate(todo, '2024-02-29')).toBe(true)
-      // 2023 is not a leap year
-      expect(shouldShowTodoOnDate(todo, '2023-02-28')).toBe(false)
+      // 2023 is not a leap year, so day 29 clamps to Feb 28
+      expect(shouldShowTodoOnDate(todo, '2023-02-28')).toBe(true)
     })
   })
 })
